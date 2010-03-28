@@ -16,14 +16,27 @@ AWS::S3::Base.establish_connection!(
 
 ll = "liquilogs"
 
+namespace :dirs do
+
+  desc 'prepare dirs'
+  task :prepare, :sitename do |t, args|
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
+
+    %w(logs data html).each { |dir| mkpath "#{sitename}/#{dir}" }
+  end
+end
+
 namespace :config do
 
   desc 'create conf file'
   task :create, :sitename do |t, args|
-    raise 'no sitename given' if args.sitename.nil?
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
 
     cd Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin', :verbose => false do
-      ln_sf 'awstats.conf.template', "awstats.#{args.sitename}.conf", :verbose => false
+#      ln_sf 'awstats.conf.template', "awstats.#{sitename}.conf", :verbose => false
+      ln_sf 'awstats.conf.template', "awstats.#{sitename}.conf"
     end
   end
 end
@@ -39,9 +52,9 @@ namespace :data do
     raise 'no bucket given' if bucket.nil?
 
     # only fetch data if dir is empty
-    if Dir['data/*'].empty?
+    if Dir["#{sitename}/data/*"].empty?
       o = AWS::S3::S3Object.find "#{ll}/data.#{sitename}.tgz", args.bucket
-      IO.popen('tar zxf - -C data', 'w') { |p| p.print o.value }
+      IO.popen("tar zxf - -C #{sitename}/data", 'w') { |p| p.print o.value }
     end
   end
 
@@ -52,7 +65,7 @@ namespace :data do
     bucket = args.bucket || config.bucket
     raise 'no bucket given' if bucket.nil?
 
-    IO.popen( "tar c -C data #{Dir['data/*'].map{|f| File.split(f).last}.join(' ')} | gzip -9fc" ) do |io|
+    IO.popen( "tar c -C data #{Dir['#{sitename}/data/*'].map{|f| File.split(f).last}.join(' ')} | gzip -9fc" ) do |io|
 #      store_url = "#{ll}/data.#{sitename}.#{Time.now.strftime('%Y%m%d-%H%M%S')}.tgz"
       store_url = "#{ll}/data.#{sitename}.tgz"
       puts "storing #{store_url}"
@@ -62,27 +75,33 @@ namespace :data do
   end
 
   desc 'clean up local data dir'
-  task :clean do
-    rm_rf Dir["data/*"]
+  task :clean, :sitename do
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
+
+    rm_rf Dir["#{sitename}/data/*"]
   end
 
 end
 
 namespace :logs do
   desc 'fetch log files'
-  task :fetch, [:bucket, :log_prefix] do |t, args|
-    raise 'no bucket given' if args.bucket.nil?
-    raise 'no log_prefix given' if args.log_prefix.nil?
+  task :fetch, [:sitename, :bucket, :log_prefix] do |t, args|
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
+    bucket = args.bucket || config.bucket
+    raise 'no bucket given' if bucket.nil?
+    log_prefix = args.log_prefix || config.log_prefix
+    raise 'no log_prefix given' if log_prefix.nil?
 
-    AWS::S3::Bucket.objects( args.bucket, :prefix => args.log_prefix ).each do |s3o|
-      open("logs/#{s3o.key.split('/').last}", 'w') do |file|
-        AWS::S3::S3Object.stream(s3o.key, args.bucket) do |chunk|
+    AWS::S3::Bucket.objects( bucket, :prefix => log_prefix ).each do |s3o|
+      open("#{sitename}/logs/#{s3o.key.split('/').last}", 'w') do |file|
+        AWS::S3::S3Object.stream(s3o.key, bucket) do |chunk|
           file.write chunk
         end
       end
     end
 
-#     system "s3cmd sync #{$from_url} logs"
   end
 
   desc 'pack logs, push them to the archive and delete old logs'
@@ -94,9 +113,7 @@ namespace :logs do
     log_prefix = args.log_prefix || config.log_prefix
     raise 'no log_prefix given' if log_prefix.nil?
 
-#    system "tar czvf logs.tgz logs/"
-#    system "s3cmd put logs.tgz #{create_store_url}"
-    log_files = Dir['logs/*'].map{|f| File.split(f).last}
+    log_files = Dir["#{sitename}/logs/*"].map{|f| File.split(f).last}
     now = Time.now
     store_url = "#{ll}/#{now.strftime('%Y/%m')}/#{sitename}-logs-#{now.strftime('%F-%H-%M-%S.tgz')}"
 
@@ -119,8 +136,11 @@ namespace :logs do
   end
 
   desc 'clean up local logs dir'
-  task :clean do
-    rm_rf Dir["logs/*"]
+  task :clean, :sitename do
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
+
+    rm_rf Dir["#{sitename}/logs/*"]
   end
 
 end
@@ -129,15 +149,15 @@ namespace :stats do
 
   desc 'run awstats'
   task :run, :sitename do |t,args|
-    raise 'no sitename given' if args.sitename.nil?
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
 
-    unless Dir['logs/*'].empty?
+    unless Dir["#{sitename}/logs/*"].empty?
 
       ENV['AWSTATS_PATH']= Pathname.pwd
-      ENV['AWSTATS_SITEDOMAIN']= args.sitename
+      ENV['AWSTATS_SITEDOMAIN']= sitename
 
-#    %x[awstats/wwwroot/cgi-bin/awstats.pl -config=#{args.sitename} -update]
-      system( "awstats/wwwroot/cgi-bin/awstats.pl -config=#{args.sitename} -update" )
+      system( "awstats/wwwroot/cgi-bin/awstats.pl -config=#{sitename} -update" )
 
       ENV.delete('AWSTATS_SITEDOMAIN')
       ENV.delete('AWSTATS_PATH')
@@ -158,28 +178,31 @@ namespace :pages do
     ENV['AWSTATS_PATH']= Pathname.pwd
     ENV['AWSTATS_SITEDOMAIN']= sitename
 
-    system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{Pathname.pwd + 'html'} -diricons=http://ki2s-icons.s3.amazonaws.com/6.95/icon" )
+    system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{Pathname.pwd + sitename + 'html'} -diricons=http://ki2s-icons.s3.amazonaws.com/6.95/icon" )
 
     ENV.delete('AWSTATS_SITEDOMAIN')
     ENV.delete('AWSTATS_PATH')
   end
 
   desc 'store HTML pages to S3'
-  task :store, :sitename, :bucket do |t,args|
+  task :store, [:sitename, :bucket] do |t,args|
     sitename = args.sitename || config.sitename
     raise 'no sitename given' if sitename.nil?
     bucket = args.bucket || config.bucket
     raise 'no bucket given' if bucket.nil?
 
-    Dir["html/*"].each do |f_name|
+    Dir["#{sitename}/html/*"].each do |f_name|
       puts "sending #{f_name}"
       AWS::S3::S3Object.store( f_name, open( f_name ), bucket, :access => :public_read )
     end
   end
 
   desc 'clean up local HTML'
-  task :clean do
-    rm_rf Dir["html/*"]
+  task :clean, :sitename do
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
+
+    rm_rf Dir["#{sitename}/html/*"]
   end
 
 end
@@ -187,13 +210,14 @@ end
 
 desc 'prepare everything'
 task :prepare, [:sitename, :bucket] do |t, args|
+  Rake::Task["dirs:prepare"].invoke args.sitename
   Rake::Task["config:create"].invoke args.sitename
   Rake::Task["data:fetch"].invoke args.sitename, args.bucket
 end
 
 desc 'run one cycle'
 task :run, [:sitename, :bucket, :log_prefix] do |t, args|
-  Rake::Task["logs:fetch"].invoke args.bucket, args.log_prefix
+  Rake::Task["logs:fetch"].invoke args.sitename, args.bucket, args.log_prefix
   Rake::Task["stats:run"].invoke args.sitename
   Rake::Task["data:store"].invoke args.sitename, args.bucket
   Rake::Task["logs:store"].invoke args.sitename, args.bucket, args.log_prefix
@@ -202,11 +226,11 @@ task :run, [:sitename, :bucket, :log_prefix] do |t, args|
 end
 
 desc 'clean everything up'
-task :clean do
+task :clean, :sitename do
   rm_rf Dir["awstats/wwwroot/cgi-bin/awstats.*.conf"]
-  Rake::Task["data:clean"].invoke
-  Rake::Task["logs:clean"].invoke
-  Rake::Task["pages:clean"].invoke
+  Rake::Task["data:clean"].invoke args.sitename
+  Rake::Task["logs:clean"].invoke args.sitename
+  Rake::Task["pages:clean"].invoke args.sitename
 end
 
 desc 'show config'

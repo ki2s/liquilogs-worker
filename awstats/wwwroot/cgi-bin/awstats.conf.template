@@ -2,8 +2,8 @@
 
 SiteDomain="__AWSTATS_SITEDOMAIN__"
 
-LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/logs/* |"
-DirData="__AWSTATS_PATH__/data"
+LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs/* |"
+DirData="__AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/data"
 DirCgi="__AWSTATS_PATH__/awstats/wwwroot/cgi-bin"
 DirIcons="/awstats-icon"
 
