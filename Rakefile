@@ -30,13 +30,15 @@ end
 namespace :config do
 
   desc 'create conf file'
-  task :create, :sitename do |t, args|
+  task :create, :sitename, :conf_type do |t, args|
+    conf_type = args.conf_type || config.conf_type
+    raise 'no scnf_type given' if conf_type.nil?
     sitename = args.sitename || config.sitename
     raise 'no sitename given' if sitename.nil?
 
     cd Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin', :verbose => false do
 #      ln_sf 'awstats.conf.template', "awstats.#{sitename}.conf", :verbose => false
-      ln_sf 'awstats.conf.template', "awstats.#{sitename}.conf"
+      ln_sf "awstats.conf.#{conf_type}.template", "awstats.#{sitename}.conf"
     end
   end
 end
@@ -75,7 +77,7 @@ namespace :data do
   end
 
   desc 'clean up local data dir'
-  task :clean, :sitename do
+  task :clean, :sitename do |t, args|
     sitename = args.sitename || config.sitename
     raise 'no sitename given' if sitename.nil?
 
@@ -136,7 +138,7 @@ namespace :logs do
   end
 
   desc 'clean up local logs dir'
-  task :clean, :sitename do
+  task :clean, :sitename do |t, args|
     sitename = args.sitename || config.sitename
     raise 'no sitename given' if sitename.nil?
 
@@ -198,7 +200,7 @@ namespace :pages do
   end
 
   desc 'clean up local HTML'
-  task :clean, :sitename do
+  task :clean, :sitename do |t, args|
     sitename = args.sitename || config.sitename
     raise 'no sitename given' if sitename.nil?
 
@@ -209,9 +211,9 @@ end
 
 
 desc 'prepare everything'
-task :prepare, [:sitename, :bucket] do |t, args|
+task :prepare, [:sitename, :bucket, :conf_type] do |t, args|
   Rake::Task["dirs:prepare"].invoke args.sitename
-  Rake::Task["config:create"].invoke args.sitename
+  Rake::Task["config:create"].invoke args.sitename, args.conf_type
   Rake::Task["data:fetch"].invoke args.sitename, args.bucket
 end
 
@@ -226,11 +228,14 @@ task :run, [:sitename, :bucket, :log_prefix] do |t, args|
 end
 
 desc 'clean everything up'
-task :clean, :sitename do
-  rm_rf Dir["awstats/wwwroot/cgi-bin/awstats.*.conf"]
-  Rake::Task["data:clean"].invoke args.sitename
-  Rake::Task["logs:clean"].invoke args.sitename
-  Rake::Task["pages:clean"].invoke args.sitename
+task :clean, :sitename do |t, args|
+  sitename = args.sitename || config.sitename
+  raise 'no sitename given' if sitename.nil?
+
+  rm_rf Dir["awstats/wwwroot/cgi-bin/awstats.#{sitename}.conf"]
+  Rake::Task["data:clean"].invoke sitename
+  Rake::Task["logs:clean"].invoke sitename
+  Rake::Task["pages:clean"].invoke sitename
 end
 
 desc 'show config'
