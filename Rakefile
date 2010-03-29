@@ -8,6 +8,9 @@ require 'pathname'
   config = OpenStruct.new
 # end
 
+require 'lib/liquilogs'
+ll_object = LiquiLogs::Worker.create( ENV['LiquiLogs'] || 'test' )
+
 require 'aws/s3'
 AWS::S3::Base.establish_connection!(
   :access_key_id     => "AKIAIRHLSVBIOYHXVQTQ",
@@ -16,32 +19,7 @@ AWS::S3::Base.establish_connection!(
 
 ll = "liquilogs"
 
-namespace :dirs do
 
-  desc 'prepare dirs'
-  task :prepare, :sitename do |t, args|
-    sitename = args.sitename || config.sitename
-    raise 'no sitename given' if sitename.nil?
-
-    %w(logs data html).each { |dir| mkpath "#{sitename}/#{dir}" }
-  end
-end
-
-namespace :config do
-
-  desc 'create conf file'
-  task :create, :sitename, :conf_type do |t, args|
-    conf_type = args.conf_type || config.conf_type
-    raise 'no scnf_type given' if conf_type.nil?
-    sitename = args.sitename || config.sitename
-    raise 'no sitename given' if sitename.nil?
-
-    cd Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin', :verbose => false do
-#      ln_sf 'awstats.conf.template', "awstats.#{sitename}.conf", :verbose => false
-      ln_sf "awstats.conf.#{conf_type}.template", "awstats.#{sitename}.conf"
-    end
-  end
-end
 
 namespace :data do
 
@@ -55,6 +33,7 @@ namespace :data do
 
     # only fetch data if dir is empty
     if Dir["#{sitename}/data/*"].empty?
+      mkpath "#{sitename}/data"
       o = AWS::S3::S3Object.find "#{ll}/data.#{sitename}.tgz", args.bucket
       IO.popen("tar zxf - -C #{sitename}/data", 'w') { |p| p.print o.value }
     end
@@ -96,6 +75,7 @@ namespace :logs do
     log_prefix = args.log_prefix || config.log_prefix
     raise 'no log_prefix given' if log_prefix.nil?
 
+    mkdir "#{sitename}/logs"
     AWS::S3::Bucket.objects( bucket, :prefix => log_prefix ).each do |s3o|
       open("#{sitename}/logs/#{s3o.key.split('/').last}", 'w') do |file|
         AWS::S3::S3Object.stream(s3o.key, bucket) do |chunk|
@@ -119,7 +99,7 @@ namespace :logs do
     now = Time.now
     store_url = "#{ll}/#{now.strftime('%Y/%m')}/#{sitename}-logs-#{now.strftime('%F-%H-%M-%S.tgz')}"
 
-    IO.popen( "tar c -C logs #{log_files.join(' ')} | gzip -9fc") do |io|
+    IO.popen( "tar c -C #{sitename}/logs #{log_files.join(' ')} | gzip -9fc") do |io|
     puts "storing #{store_url}"
       AWS::S3::S3Object.store( store_url,
 			       io.read,
@@ -130,9 +110,8 @@ namespace :logs do
     log_files.each do |log|
       # TODO: better deletion
       puts "deleting #{log_prefix[0..log_prefix.rindex( '/')] + log}"
-      AWS::S3::S3Object.delete( "log-s3/#{log}", bucket )
+#      AWS::S3::S3Object.delete( "log-s3/#{log}", bucket )
     end
-#    system "for i in `ls -1 logs/`; do s3cmd del #{$from_url}$i; done"
 
     Rake::Task["logs:clean"].invoke
   end
@@ -148,6 +127,20 @@ namespace :logs do
 end
 
 namespace :stats do
+
+  desc 'create conf file'
+  task :create_config, :sitename, :conf_type do |t, args|
+    sitename = args.sitename || config.sitename
+    raise 'no sitename given' if sitename.nil?
+    conf_type = args.conf_type || config.conf_type
+    raise 'no scnf_type given' if conf_type.nil?
+
+    unless File.exists? Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + "awstats.#{sitename}.conf"
+      cd Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin', :verbose => false do
+        ln_sf "awstats.conf.#{conf_type}.template", "awstats.#{sitename}.conf"
+      end
+    end
+  end
 
   desc 'run awstats'
   task :run, :sitename do |t,args|
@@ -176,6 +169,8 @@ namespace :pages do
   task :create, :sitename do |t,args|
     sitename = args.sitename || config.sitename
     raise 'no sitename given' if sitename.nil?
+
+    mkdir "#{sitename}/html"
 
     ENV['AWSTATS_PATH']= Pathname.pwd
     ENV['AWSTATS_SITEDOMAIN']= sitename
@@ -210,16 +205,11 @@ namespace :pages do
 end
 
 
-desc 'prepare everything'
-task :prepare, [:sitename, :bucket, :conf_type] do |t, args|
-  Rake::Task["dirs:prepare"].invoke args.sitename
-  Rake::Task["config:create"].invoke args.sitename, args.conf_type
-  Rake::Task["data:fetch"].invoke args.sitename, args.bucket
-end
-
 desc 'run one cycle'
-task :run, [:sitename, :bucket, :log_prefix] do |t, args|
+task :run, [:sitename, :bucket, :log_prefix, :conf_type] do |t, args|
+  Rake::Task["data:fetch"].invoke args.sitename, args.bucket
   Rake::Task["logs:fetch"].invoke args.sitename, args.bucket, args.log_prefix
+  Rake::Task["stats:create_config"].invoke args.sitename, args.conf_type
   Rake::Task["stats:run"].invoke args.sitename
   Rake::Task["data:store"].invoke args.sitename, args.bucket
   Rake::Task["logs:store"].invoke args.sitename, args.bucket, args.log_prefix
