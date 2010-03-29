@@ -2,3 +2,4 @@
 data
 logs
 html
+awstats.*.conf
