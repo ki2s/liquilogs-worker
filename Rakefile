@@ -46,7 +46,7 @@ namespace :data do
     bucket = args.bucket || config.bucket
     raise 'no bucket given' if bucket.nil?
 
-    IO.popen( "tar c -C data #{Dir['#{sitename}/data/*'].map{|f| File.split(f).last}.join(' ')} | gzip -9fc" ) do |io|
+    IO.popen( "tar c -C #{sitename}/data #{Dir[sitename+'/data/*'].map{|f| File.split(f).last}.join(' ')} | gzip -9fc" ) do |io|
 #      store_url = "#{ll}/data.#{sitename}.#{Time.now.strftime('%Y%m%d-%H%M%S')}.tgz"
       store_url = "#{ll}/data.#{sitename}.tgz"
       puts "storing #{store_url}"
@@ -75,7 +75,7 @@ namespace :logs do
     log_prefix = args.log_prefix || config.log_prefix
     raise 'no log_prefix given' if log_prefix.nil?
 
-    mkdir "#{sitename}/logs"
+    mkpath "#{sitename}/logs" unless File.exists? "#{sitename}/logs"
     AWS::S3::Bucket.objects( bucket, :prefix => log_prefix ).each do |s3o|
       open("#{sitename}/logs/#{s3o.key.split('/').last}", 'w') do |file|
         AWS::S3::S3Object.stream(s3o.key, bucket) do |chunk|
@@ -113,7 +113,7 @@ namespace :logs do
 #      AWS::S3::S3Object.delete( "log-s3/#{log}", bucket )
     end
 
-    Rake::Task["logs:clean"].invoke
+    Rake::Task["logs:clean"].invoke sitename
   end
 
   desc 'clean up local logs dir'
