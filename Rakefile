@@ -8,8 +8,8 @@ require 'pathname'
   config = OpenStruct.new
 # end
 
-require 'lib/liquilogs'
-ll_object = LiquiLogs::Worker.create( ENV['LiquiLogs'] || 'test' )
+#require 'lib/liquilogs'
+#ll_object = LiquiLogs::Worker.create( ENV['LiquiLogs'] || 'test' )
 
 require 'aws/s3'
 AWS::S3::Base.establish_connection!(
@@ -170,7 +170,7 @@ namespace :pages do
     sitename = args.sitename || config.sitename
     raise 'no sitename given' if sitename.nil?
 
-    mkdir "#{sitename}/html"
+    mkpath "#{sitename}/html" unless File.exists? "#{sitename}/logs"
 
     ENV['AWSTATS_PATH']= Pathname.pwd
     ENV['AWSTATS_SITEDOMAIN']= sitename
