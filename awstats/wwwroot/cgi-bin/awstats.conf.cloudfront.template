@@ -1,17 +1,20 @@
-# LiquidLogs part for S3 logs
+# LiquidLogs part for CloudFront logs
 
 SiteDomain="__AWSTATS_SITEDOMAIN__"
-
-#LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs/* |"
-LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs |"
+LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs/* |"
 DirData="__AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/data"
-DirCgi="__AWSTATS_PATH__/awstats/wwwroot/cgi-bin"
-DirIcons="/awstats-icon"
 
-LogFormat="%other %virtualname %time1 %host %logname %other %method %url %methodurl %code %other %bytesd %other %other %other %refererquot %uaquot"
-LogSeparator=" "
-ShowClusterStats=0
+#LogFormat="%other %virtualname %time1 %host %logname %other %method %url %methodurl %code %other %bytesd %other %other %other %refererquot %uaquot"
+LogFormat = "%time2 %cluster %bytesd %host %method %virtualname %url %code %referer %ua"
+LogSeparator="\t"
+
+ShowClusterStats=1
+#LoadPlugin="clusterinfo"
+#LoadPlugin="graphapplet http://ki2s-icons.s3.amazonaws.com/6.95/awstatsclasses"
+
 ValidHTTPCodes="200 206 304"
+
+
 
 
 # AWSTATS CONFIGURE FILE 6.6
