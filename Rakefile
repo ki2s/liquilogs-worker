@@ -115,7 +115,7 @@ namespace :pages do
     ENV['AWSTATS_PATH']= Pathname.pwd
     ENV['AWSTATS_SITEDOMAIN']= sitename
 
-    system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{Pathname.pwd + sitename + 'html'} -diricons=http://ki2s-icons.s3.amazonaws.com/6.95/icon -month=03 -year=2010" )
+    system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{Pathname.pwd + sitename + 'html'} -diricons=http://ki2s-icons.s3.amazonaws.com/6.95/icon" )
 
     ENV.delete('AWSTATS_SITEDOMAIN')
     ENV.delete('AWSTATS_PATH')
