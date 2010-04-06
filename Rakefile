@@ -61,6 +61,7 @@ namespace :logs do
 #    store_url = "#{ll}/#{now.strftime('%Y/%m')}/#{sitename}-logs-#{now.strftime('%F-%H-%M-%S.tgz')}"
     store_url = "liquilogs/#{now.strftime('%Y/%m')}/#{sitename}-logs-#{now.strftime('%F-%H-%M-%S.tgz')}"
 
+    puts( "tar c -C #{sitename}/logs #{log_files.join(' ')} | gzip -9fc")
     IO.popen( "tar c -C #{sitename}/logs #{log_files.join(' ')} | gzip -9fc") do |io|
     puts "storing #{store_url}"
       AWS::S3::S3Object.store( store_url,
@@ -152,7 +153,7 @@ task :run, [:sitename, :bucket, :log_prefix, :conf_type] do |t, args|
   Rake::Task["stats:create_config"].invoke args.sitename, args.conf_type
   Rake::Task["stats:run"].invoke args.sitename
   Rake::Task["data:store"].invoke args.sitename, args.bucket
-  Rake::Task["logs:store"].invoke args.sitename, args.bucket, args.log_prefix
+#  Rake::Task["logs:store"].invoke args.sitename, args.bucket, args.log_prefix
   Rake::Task["pages:create"].invoke args.sitename
   Rake::Task["pages:store"].invoke args.sitename, args.bucket
 end
