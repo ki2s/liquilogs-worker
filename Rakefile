@@ -154,10 +154,6 @@ task :run, [:sitename, :bucket, :log_prefix, :conf_type] do |t, args|
   Rake::Task["stats:run"].invoke args.sitename
   Rake::Task["data:store"].invoke args.sitename, args.bucket
 #  Rake::Task["logs:store"].invoke args.sitename, args.bucket, args.log_prefix
-end
-
-desc 'run pages cycle'
-task :update_pages, [:sitename, :bucket, :log_prefix, :conf_type] do |t, args|
   Rake::Task["pages:create"].invoke args.sitename
   Rake::Task["pages:store"].invoke args.sitename, args.bucket
 end
