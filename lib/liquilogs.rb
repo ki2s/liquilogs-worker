@@ -6,6 +6,13 @@ require 'pathname'
 require 'fileutils'
 require 'rubygems'
 
+#require 'aws/s3'
+# AWS::S3::Base.establish_connection!(
+#   :access_key_id     => "AKIAIRHLSVBIOYHXVQTQ",
+#   :secret_access_key => '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'
+# )
+
+
 module LiquiLogs; end
 
 class LiquiLogs::Worker
@@ -17,7 +24,7 @@ class LiquiLogs::Worker
                             :log_prefix => 'log-s3/access_log',
                             :conf_type  => 's3',
                             # alex@ki2s.com
-                            :aws_key    => '"AKIAIRHLSVBIOYHXVQTQ"',
+                            :aws_key    => 'AKIAIRHLSVBIOYHXVQTQ',
                             :aws_secret => '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'
 
                             # :sitename   => 'd1l8043zxfup2z.cloudfront.net',
@@ -80,6 +87,28 @@ class LiquiLogs::Worker
     end
   end
 
+  def store_logs
+    log_files = Dir["#{sitename}/logs/*"].map{|f| File.split(f).last}
+    now = Time.now
+#    store_url = "#{ll}/#{now.strftime('%Y/%m')}/#{sitename}-logs-#{now.strftime('%F-%H-%M-%S.tgz')}"
+    store_url = "liquilogs/#{now.strftime('%Y/%m')}/#{sitename}-logs-#{now.strftime('%F-%H-%M-%S.tgz')}"
+
+    puts( "tar c -C #{sitename}/logs #{log_files.join(' ')} | gzip -9fc")
+    IO.popen( "tar c -C #{sitename}/logs #{log_files.join(' ')} | gzip -9fc") do |io|
+    puts "storing #{store_url}"
+      AWS::S3::S3Object.store( store_url,
+			       io.read,
+                               bucket,
+                               :access => :public_read )
+    end
+
+    log_files.each do |log|
+      # TODO: better deletion
+      puts "deleting #{log_prefix[0..log_prefix.rindex( '/')] + log}"
+#      AWS::S3::S3Object.delete( log_prefix[0..log_prefix.rindex('/')] + log, bucket )
+    end
+  end
+
   def create_config
     unless File.exists? Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + "awstats.#{sitename}.conf"
       cd Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin', :verbose => false do
@@ -98,6 +127,35 @@ class LiquiLogs::Worker
     ENV.delete('AWSTATS_PATH')
   end
 
+  def create_pages
+    ( sitedir + 'html' ).mkpath
+
+    ENV['AWSTATS_PATH']= Pathname.pwd
+    ENV['AWSTATS_SITEDOMAIN']= sitename
+
+    system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{Pathname.pwd + sitename + 'html'}" )
+
+    ENV.delete('AWSTATS_SITEDOMAIN')
+    ENV.delete('AWSTATS_PATH')
+  end
+
+  def store_pages
+    Dir["#{sitename}/html/*"].each do |f_name|
+      puts "sending #{f_name}"
+      AWS::S3::S3Object.store( f_name, open( f_name ), bucket, :access => :public_read )
+    end
+  end
+
+  def run
+    fetch_data
+    fetch_logs
+    create_config
+    run_stats
+    store_data
+    # store_logs
+    create_pages
+    store_pages
+  end
 end
 
 

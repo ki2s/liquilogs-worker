@@ -6,12 +6,14 @@ SiteDomain="__AWSTATS_SITEDOMAIN__"
 LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs |"
 DirData="__AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/data"
 DirCgi="__AWSTATS_PATH__/awstats/wwwroot/cgi-bin"
-DirIcons="/awstats-icon"
 
 LogFormat="%other %virtualname %time1 %host %logname %other %method %url %methodurl %code %other %bytesd %other %other %other %refererquot %uaquot"
 LogSeparator=" "
 ShowClusterStats=0
 ValidHTTPCodes="200 206 304"
+
+#DirIcons="/awstats-icon"
+DirIcons="http://ki2s-icons.s3.amazonaws.com/6.95/icon"
 
 
 # AWSTATS CONFIGURE FILE 6.6

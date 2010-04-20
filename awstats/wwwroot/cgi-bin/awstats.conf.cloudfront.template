@@ -14,6 +14,8 @@ ShowClusterStats=1
 
 ValidHTTPCodes="200 206 304"
 
+#DirIcons="/awstats-icon"
+DirIcons="http://ki2s-icons.s3.amazonaws.com/6.95/icon"
 
 
 
