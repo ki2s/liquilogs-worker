@@ -1,66 +1,72 @@
 
 require 'lib/liquilogs'
-ll_object = LiquiLogs::Worker.create
 
-
-namespace :data do
-
-  desc 'fetch data.tgz from bucket and prepare them'
-  task :fetch do
-    ll_object.fetch_data
+LiquiLogs::Worker.rake_tasks.each do |taskname, methodname,  description|
+  desc description
+  task taskname do
+    LiquiLogs::Worker.create.send methodname
   end
-
-  desc 'pack data files into tgz and push them to the bucket archive'
-  task :store do
-    ll_object.store_data
-  end
-
-end
-
-namespace :logs do
-  desc 'fetch log files'
-  task :fetch do
-    ll_object.fetch_logs
-  end
-
-  desc 'pack logs, push them to the archive and delete old logs'
-  task :store do
-    ll_object.store_logs
-  end
-
-end
-
-namespace :stats do
-
-  desc 'create conf file'
-  task :create_config do
-    ll_object.create_config
-  end
-
-  desc 'run awstats'
-  task :run do
-    ll_object.run_stats
-  end
-
 end
 
 
-namespace :pages do
+# namespace :data do
 
-  desc 'create HTML pages'
-  task :create do
-    ll_object.create_pages
-  end
+#   desc 'fetch data.tgz from bucket and prepare them'
+#   task :fetch do
+#     LiquiLogs::Worker.create.fetch_data
+#   end
 
-  desc 'store HTML pages to S3'
-  task :store do
-    ll_object.store_pages
-  end
+#   desc 'pack data files into tgz and push them to the bucket archive'
+#   task :store do
+#     LiquiLogs::Worker.create.store_data
+#   end
 
-end
+# end
+
+# namespace :logs do
+#   desc 'fetch log files'
+#   task :fetch do
+#     LiquiLogs::Worker.create.fetch_logs
+#   end
+
+#   desc 'pack logs, push them to the archive and delete old logs'
+#   task :store do
+#     LiquiLogs::Worker.create.store_logs
+#   end
+
+# end
+
+# namespace :stats do
+
+#   desc 'create conf file'
+#   task :create_config do
+#     LiquiLogs::Worker.create.create_config
+#   end
+
+#   desc 'run awstats'
+#   task :run do
+#     LiquiLogs::Worker.create.run_stats
+#   end
+
+# end
 
 
-desc 'run data cycle'
-task :run, [:sitename, :bucket, :log_prefix, :conf_type] do |t, args|
-  ll_object.run
-end
+# namespace :pages do
+
+#   desc 'create HTML pages'
+#   task :create do
+#     LiquiLogs::Worker.create.create_pages
+#   end
+
+#   desc 'store HTML pages to S3'
+#   task :store do
+#     LiquiLogs::Worker.create.store_pages
+#   end
+
+# end
+
+
+# desc 'run data cycle'
+# task :run do
+#   LiquiLogs::Worker.create.run
+# end

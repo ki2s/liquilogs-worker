@@ -1,7 +1,8 @@
 # LiquidLogs part for CloudFront logs
 
 SiteDomain="__AWSTATS_SITEDOMAIN__"
-LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs/* |"
+#LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs/* |"
+LogFile="__AWSTATS_PATH__/awstats/tools/logresolvemerge.pl __AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/logs |"
 DirData="__AWSTATS_PATH__/__AWSTATS_SITEDOMAIN__/data"
 
 #LogFormat="%other %virtualname %time1 %host %logname %other %method %url %methodurl %code %other %bytesd %other %other %other %refererquot %uaquot"

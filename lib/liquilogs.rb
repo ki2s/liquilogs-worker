@@ -16,6 +16,9 @@ require 'rubygems'
 module LiquiLogs; end
 
 class LiquiLogs::Worker
+  @rake_tasks = []
+  class << self; attr_accessor :rake_tasks end
+
   def initialize config=nil
     require 'ostruct'
     @config= OpenStruct.new(
@@ -59,6 +62,7 @@ class LiquiLogs::Worker
   def conf_type; @config.conf_type; end
   def ll; "liquilogs"; end
 
+  @rake_tasks << [[:data,:fetch], :fetch_data, 'fetch data.tgz from bucket and prepare them']
   def fetch_data
     # only fetch data if dir is empty
     if Dir["#{sitename}/data/*"].empty?
@@ -68,6 +72,7 @@ class LiquiLogs::Worker
     end
   end
 
+  @rake_tasks << [[:data,:store], :store_data, 'pack data files into tgz and push them to the bucket archive']
   def store_data
     file_list = Pathname.glob( sitedir+'data'+ '*').map( &:basename).join(' ')
     IO.popen( "tar c -C #{ sitedir+'data' } #{file_list} | gzip -9fc" ) do |io|
@@ -79,6 +84,7 @@ class LiquiLogs::Worker
     end
   end
 
+  @rake_tasks << [[:logs,:fetch], :fetch_logs, 'fetch log files']
   def fetch_logs
     (sitedir + 'logs').open('w') do |file|
       AWS::S3::Bucket.objects( bucket, :prefix => log_prefix).each do |s3o|
@@ -87,6 +93,7 @@ class LiquiLogs::Worker
     end
   end
 
+  @rake_tasks << [[:logs,:store], :store_logs, 'pack logs, push them to the archive and delete old logs']
   def store_logs
     log_files = Dir["#{sitename}/logs/*"].map{|f| File.split(f).last}
     now = Time.now
@@ -109,6 +116,7 @@ class LiquiLogs::Worker
     end
   end
 
+  @rake_tasks << [[:stats,:create_config], :create_config, 'create conf file']
   def create_config
     unless File.exists? Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + "awstats.#{sitename}.conf"
       cd Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin', :verbose => false do
@@ -117,6 +125,7 @@ class LiquiLogs::Worker
     end
   end
 
+  @rake_tasks << [[:stats,:run], :run_stats, 'run awstats']
   def run_stats
     ENV['AWSTATS_PATH']= Pathname.pwd
     ENV['AWSTATS_SITEDOMAIN']= sitename
@@ -127,6 +136,7 @@ class LiquiLogs::Worker
     ENV.delete('AWSTATS_PATH')
   end
 
+  @rake_tasks << [[:pages,:create], :create_pages, 'create HTML pages']
   def create_pages
     ( sitedir + 'html' ).mkpath
 
@@ -139,6 +149,7 @@ class LiquiLogs::Worker
     ENV.delete('AWSTATS_PATH')
   end
 
+  @rake_tasks << [[:pages,:store], :store_pages, 'store HTML pages to S3']
   def store_pages
     Dir["#{sitename}/html/*"].each do |f_name|
       puts "sending #{f_name}"
@@ -146,6 +157,7 @@ class LiquiLogs::Worker
     end
   end
 
+  @rake_tasks << [:run, :run, 'run data cycle']
   def run
     fetch_data
     fetch_logs
