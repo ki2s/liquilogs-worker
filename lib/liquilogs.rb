@@ -57,6 +57,11 @@ class LiquiLogs::Worker
 
   def sitename; @config.sitename; end
   def sitedir; @sitedir ||= Pathname.new( sitename ); end
+  def data_dir;
+    @data_dir ||= sitedir + 'data'
+    @data_dir.mkpath unless @data_dir.exist?
+    @data_dir
+  end
   def bucket; @config.bucket; end
   def log_prefix; @config.log_prefix; end
   def conf_type; @config.conf_type; end
@@ -65,10 +70,9 @@ class LiquiLogs::Worker
   @rake_tasks << [[:data,:fetch], :fetch_data, 'fetch data.tgz from bucket and prepare them']
   def fetch_data
     # only fetch data if dir is empty
-    if Dir["#{sitename}/data/*"].empty?
-      FileUtils.mkpath "#{sitename}/data" unless File.exists? "#{sitename}/data"
+    if Pathname.glob( data_dir + 'awstats*').empty?
       o = AWS::S3::S3Object.find "#{ll}/data.#{sitename}.tgz", bucket
-      IO.popen("tar zxf - -C #{sitename}/data", 'w') { |p| p.print o.value }
+      IO.popen("tar zxf - -C #{data_dir}", 'w') { |p| p.print o.value }
     end
   end
 
@@ -77,8 +81,7 @@ class LiquiLogs::Worker
     file_list = Pathname.glob( sitedir+'data'+ '*').map( &:basename).join(' ')
     IO.popen( "tar c -C #{ sitedir+'data' } #{file_list} | gzip -9fc" ) do |io|
 #      store_url = "#{ll}/data.#{sitename}.#{Time.now.strftime('%Y%m%d-%H%M%S')}.tgz"
-#      store_url = "#{ll}/data.#{sitename}.tgz"
-      store_url = "#{ll}/data.#{sitename}.temp.tgz"
+      store_url = "#{ll}/data.#{sitename}.tgz"
       puts "storing #{store_url}"
       AWS::S3::S3Object.store( store_url, io.read, bucket, :access => :public_read )
     end
@@ -86,10 +89,21 @@ class LiquiLogs::Worker
 
   @rake_tasks << [[:logs,:fetch], :fetch_logs, 'fetch log files']
   def fetch_logs
+    last_log_key_file = data_dir + 'last_log_key'
+    last_key = last_log_key_file.exist? ? last_log_key_file.read : ""
+
+#    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => 'log-s3/access_log-2010-04-22-00-20-42-0E30443645F32174')
+    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => last_key)
+    return if log_objects.empty?
+
     (sitedir + 'logs').open('w') do |file|
-      AWS::S3::Bucket.objects( bucket, :prefix => log_prefix).each do |s3o|
+      log_objects.each do |s3o|
+        puts "fetching #{s3o.key}"
         s3o.value { |chunk| file.write(chunk) }
       end
+    end
+    (data_dir + 'last_log_key').open('w') do |file|
+      file.write log_objects.last.key
     end
   end
 
