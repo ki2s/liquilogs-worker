@@ -100,7 +100,7 @@ class LiquiLogs::Worker
     last_key = last_log_key_file.exist? ? last_log_key_file.read : ""
 
 #    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => 'log-s3/access_log-2010-04-22-00-20-42-0E30443645F32174')
-    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => last_key)[0..100]
+    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => last_key)
     return if log_objects.empty?
 
     (sitedir + 'logs').open('w') do |file|
