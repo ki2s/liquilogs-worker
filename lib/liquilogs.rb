@@ -4,6 +4,8 @@
 
 require 'pathname'
 require 'fileutils'
+require 'zlib'
+
 require 'rubygems'
 
 #require 'aws/s3'
@@ -22,21 +24,21 @@ class LiquiLogs::Worker
   def initialize config=nil
     require 'ostruct'
     @config= OpenStruct.new(
-                            :sitename   => 'rubypulse',
-                            :bucket     => 'rubypulse-logs',
-                            :log_prefix => 'log-s3/access_log',
-                            :conf_type  => 's3',
-                            # alex@ki2s.com
-                            :aws_key    => 'AKIAIRHLSVBIOYHXVQTQ',
-                            :aws_secret => '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'
-
-                            # :sitename   => 'd1l8043zxfup2z.cloudfront.net',
+                            # :sitename   => 'rubypulse',
                             # :bucket     => 'rubypulse-logs',
-                            # :log_prefix => 'log-cloudfront/',
-                            # :conf_type  => 'cloudfront',
-                            # # alex@peuchert.de
-                            # :aws_key    => 'AKIAIYW27IP7RYPITBCQ',
-                            # :aws_secret => '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'
+                            # :log_prefix => 'log-s3/access_log',
+                            # :conf_type  => 's3',
+                            # # alex@ki2s.com
+                            # :aws_key    => 'AKIAIRHLSVBIOYHXVQTQ',
+                            # :aws_secret => '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'
+
+                            :sitename   => 'd1l8043zxfup2z.cloudfront.net',
+                            :bucket     => 'rubypulse-logs',
+                            :log_prefix => 'log-cloudfront/',
+                            :conf_type  => 'cloudfront',
+                            # alex@peuchert.de
+                            :aws_key    => 'AKIAIYW27IP7RYPITBCQ',
+                            :aws_secret => '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'
                             )
 
     require 'aws/s3'
@@ -56,11 +58,16 @@ class LiquiLogs::Worker
   end
 
   def sitename; @config.sitename; end
-  def sitedir; @sitedir ||= Pathname.new( sitename ); end
-  def data_dir;
-    @data_dir ||= sitedir + 'data'
-    @data_dir.mkpath unless @data_dir.exist?
-    @data_dir
+  def sitedir; @sitedir ||= Pathname.new( 'sites' ) + sitename; end
+  def datadir;
+    @datadir ||= sitedir + 'data'
+    @datadir.mkpath unless @datadir.exist?
+    @datadir
+  end
+  def htmldir;
+    @htmldir ||= sitedir + 'html'
+    @htmldir.mkpath unless @htmldir.exist?
+    @htmldir
   end
   def bucket; @config.bucket; end
   def log_prefix; @config.log_prefix; end
@@ -70,16 +77,16 @@ class LiquiLogs::Worker
   @rake_tasks << [[:data,:fetch], :fetch_data, 'fetch data.tgz from bucket and prepare them']
   def fetch_data
     # only fetch data if dir is empty
-    if Pathname.glob( data_dir + 'awstats*').empty?
+    if Pathname.glob( datadir + 'awstats*').empty?
       o = AWS::S3::S3Object.find "#{ll}/data.#{sitename}.tgz", bucket
-      IO.popen("tar zxf - -C #{data_dir}", 'w') { |p| p.print o.value }
+      IO.popen("tar zxf - -C #{datadir}", 'w') { |p| p.print o.value }
     end
   end
 
   @rake_tasks << [[:data,:store], :store_data, 'pack data files into tgz and push them to the bucket archive']
   def store_data
     file_list = Pathname.glob( sitedir+'data'+ '*').map( &:basename).join(' ')
-    IO.popen( "tar c -C #{ sitedir+'data' } #{file_list} | gzip -9fc" ) do |io|
+    IO.popen( "tar c -C #{datadir} #{file_list} | gzip -9fc" ) do |io|
 #      store_url = "#{ll}/data.#{sitename}.#{Time.now.strftime('%Y%m%d-%H%M%S')}.tgz"
       store_url = "#{ll}/data.#{sitename}.tgz"
       puts "storing #{store_url}"
@@ -89,20 +96,31 @@ class LiquiLogs::Worker
 
   @rake_tasks << [[:logs,:fetch], :fetch_logs, 'fetch log files']
   def fetch_logs
-    last_log_key_file = data_dir + 'last_log_key'
+    last_log_key_file = datadir + 'last_log_key'
     last_key = last_log_key_file.exist? ? last_log_key_file.read : ""
 
 #    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => 'log-s3/access_log-2010-04-22-00-20-42-0E30443645F32174')
-    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => last_key)
+    log_objects = AWS::S3::Bucket.objects( bucket, :prefix => log_prefix, :marker => last_key)[0..100]
     return if log_objects.empty?
 
     (sitedir + 'logs').open('w') do |file|
       log_objects.each do |s3o|
-        puts "fetching #{s3o.key}"
-        s3o.value { |chunk| file.write(chunk) }
+        case conf_type.to_sym
+        when :s3
+          puts "fetching #{s3o.key} -> appending"
+          s3o.value { |chunk| file.write(chunk) }
+        when :cloudfront
+          puts "fetching #{s3o.key} -> ungzipping -> appending"
+          begin
+            gz = Zlib::GzipReader.new( StringIO.new( s3o.value ) )
+            file << gz.read
+            gz.close
+          rescue
+          end
+        end
       end
     end
-    (data_dir + 'last_log_key').open('w') do |file|
+    (datadir + 'last_log_key').open('w') do |file|
       file.write log_objects.last.key
     end
   end
@@ -152,12 +170,13 @@ class LiquiLogs::Worker
 
   @rake_tasks << [[:pages,:create], :create_pages, 'create HTML pages']
   def create_pages
-    ( sitedir + 'html' ).mkpath
+    htmldir.mkpath
+#    ( sitedir + 'html' ).mkpath
 
     ENV['AWSTATS_PATH']= Pathname.pwd
     ENV['AWSTATS_SITEDOMAIN']= sitename
 
-    system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{Pathname.pwd + sitename + 'html'}" )
+    system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{htmldir}" )
 
     ENV.delete('AWSTATS_SITEDOMAIN')
     ENV.delete('AWSTATS_PATH')
@@ -165,7 +184,7 @@ class LiquiLogs::Worker
 
   @rake_tasks << [[:pages,:store], :store_pages, 'store HTML pages to S3']
   def store_pages
-    Dir["#{sitename}/html/*"].each do |f_name|
+    Dir[htmldir + '*'].each do |f_name|
       puts "sending #{f_name}"
       AWS::S3::S3Object.store( f_name, open( f_name ), bucket, :access => :public_read )
     end
