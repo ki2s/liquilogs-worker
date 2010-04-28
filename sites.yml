@@ -1,0 +1,13 @@
+--- 
+cloudfront: 
+  :sitename: d1l8043zxfup2z.cloudfront.net
+  :bucket: rubypulse-logs
+  :log_prefix: log-cloudfront/
+  :conf_type: cloudfront
+  :aws_key: AKIAIYW27IP7RYPITBCQ
+  :aws_secret: 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
+rubypulse: 
+  :sitename: rubypulse
+  :bucket: rubypulse-logs
+  :log_prefix: log-s3/access_log
+  :conf_type: s3

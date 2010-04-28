@@ -8,53 +8,63 @@ require 'zlib'
 
 require 'rubygems'
 
-#require 'aws/s3'
-# AWS::S3::Base.establish_connection!(
-#   :access_key_id     => "AKIAIRHLSVBIOYHXVQTQ",
-#   :secret_access_key => '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'
-# )
-
 
 module LiquiLogs; end
 
 class LiquiLogs::Worker
+  # default AWS key alex@ki2s.com
+  AWS_KEY= 'AKIAIRHLSVBIOYHXVQTQ'
+  AWS_ACCESS_KEY= 'aaQ1w9k8l4oTYT4W27y9A4mxHBsZCYfeD2z4KHe0'
+
   @rake_tasks = []
   class << self; attr_accessor :rake_tasks end
 
-  def initialize config=nil
+  def initialize config
     require 'ostruct'
-    @config= OpenStruct.new(
-                            # :sitename   => 'rubypulse',
-                            # :bucket     => 'rubypulse-logs',
-                            # :log_prefix => 'log-s3/access_log',
-                            # :conf_type  => 's3',
-                            # # alex@ki2s.com
-                            # :aws_key    => 'AKIAIRHLSVBIOYHXVQTQ',
-                            # :aws_secret => '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'
-
-                            :sitename   => 'd1l8043zxfup2z.cloudfront.net',
-                            :bucket     => 'rubypulse-logs',
-                            :log_prefix => 'log-cloudfront/',
-                            :conf_type  => 'cloudfront',
-                            # alex@peuchert.de
-                            :aws_key    => 'AKIAIYW27IP7RYPITBCQ',
-                            :aws_secret => '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'
-                            )
+    @config= OpenStruct.new config
 
     require 'aws/s3'
-    AWS::S3::Base.establish_connection!( :access_key_id     => @config.aws_key,
-                                         :secret_access_key => @config.aws_secret,
+    AWS::S3::Base.establish_connection!( :access_key_id     => @config.aws_key || AWS_KEY,
+                                         :secret_access_key => @config.aws_secret || AWS_ACCESS_KEY ,
                                          :use_ssl           => true,
                                          :persistent        => true
                                          )
   end
 
   def self.create config=nil
-    o = case config
-        when Hash
-          new config
-        end
-    return new
+    case config
+    when Hash
+      new config
+    when Symbol, String
+      require 'yaml'
+      config_file = YAML::load(File.read('sites.yml'))
+      raise "#{config} not found in sites.yaml" unless config_file.keys.include? config
+      new config_file[config.to_s]
+
+      # case config.to_sym
+      #         when :rubypulse
+      #           {
+      #     :sitename   => 'rubypulse',
+      #     :bucket     => 'rubypulse-logs',
+      #     :log_prefix => 'log-s3/access_log',
+      #     :conf_type  => 's3',
+      #     # alex@ki2s.com
+      #     :aws_key    => 'AKIAIRHLSVBIOYHXVQTQ',
+      #     :aws_secret => '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'
+      #   }
+      #         when :cloudfront
+      #   :sitename   => 'd1l8043zxfup2z.cloudfront.net',
+      #   :bucket     => 'rubypulse-logs',
+      #   :log_prefix => 'log-cloudfront/',
+      #   :conf_type  => 'cloudfront',
+      #   # alex@peuchert.de
+      #   :aws_key    => 'AKIAIYW27IP7RYPITBCQ',
+      #   :aws_secret => '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'
+      # }
+
+    else
+      create :rubypulse
+    end
   end
 
   def sitename; @config.sitename; end
@@ -88,7 +98,7 @@ class LiquiLogs::Worker
     file_list = Pathname.glob( sitedir+'data'+ '*').map( &:basename).join(' ')
     IO.popen( "tar c -C #{datadir} #{file_list} | gzip -9fc" ) do |io|
 #      store_url = "#{ll}/data.#{sitename}.#{Time.now.strftime('%Y%m%d-%H%M%S')}.tgz"
-      store_url = "#{ll}/data.#{sitename}.tgz"
+      store_url = "#{ll}/data.#{sitename}.temp.tgz"
       puts "storing #{store_url}"
       AWS::S3::S3Object.store( store_url, io.read, bucket, :access => :public_read )
     end
