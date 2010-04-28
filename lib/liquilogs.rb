@@ -38,30 +38,8 @@ class LiquiLogs::Worker
     when Symbol, String
       require 'yaml'
       config_file = YAML::load(File.read('sites.yml'))
-      raise "#{config} not found in sites.yaml" unless config_file.keys.include? config
-      new config_file[config.to_s]
-
-      # case config.to_sym
-      #         when :rubypulse
-      #           {
-      #     :sitename   => 'rubypulse',
-      #     :bucket     => 'rubypulse-logs',
-      #     :log_prefix => 'log-s3/access_log',
-      #     :conf_type  => 's3',
-      #     # alex@ki2s.com
-      #     :aws_key    => 'AKIAIRHLSVBIOYHXVQTQ',
-      #     :aws_secret => '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'
-      #   }
-      #         when :cloudfront
-      #   :sitename   => 'd1l8043zxfup2z.cloudfront.net',
-      #   :bucket     => 'rubypulse-logs',
-      #   :log_prefix => 'log-cloudfront/',
-      #   :conf_type  => 'cloudfront',
-      #   # alex@peuchert.de
-      #   :aws_key    => 'AKIAIYW27IP7RYPITBCQ',
-      #   :aws_secret => '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'
-      # }
-
+      raise "#{config} not found in sites.yaml" unless config_file.keys.include? config.to_s
+      create config_file[config.to_s]
     else
       create :rubypulse
     end
