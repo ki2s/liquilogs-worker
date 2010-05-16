@@ -65,7 +65,7 @@ class LiquiLogs::Worker
   @rake_tasks << [[:data,:fetch], :fetch_data, 'fetch data.tgz from bucket and prepare them']
   def fetch_data
     # only fetch data if dir is empty
-    if Pathname.glob( datadir + 'awstats*').empty?
+    if Pathname.glob( (datadir + 'awstats*').to_s ).empty?
       o = AWS::S3::S3Object.find "#{ll}/data.#{sitename}.tgz", bucket
       IO.popen("tar zxf - -C #{datadir}", 'w') { |p| p.print o.value }
     end
@@ -73,13 +73,17 @@ class LiquiLogs::Worker
 
   @rake_tasks << [[:data,:store], :store_data, 'pack data files into tgz and push them to the bucket archive']
   def store_data
-    file_list = Pathname.glob( sitedir+'data'+ '*').map( &:basename).join(' ')
-    IO.popen( "tar c -C #{datadir} #{file_list} | gzip -9fc" ) do |io|
+    file_list = Pathname.glob( (sitedir+'data'+'*').to_s).map( &:basename).join(' ')
+    store_url = "#{ll}/data.#{sitename}.temp.tgz"
+#    IO.popen( "tar c -C #{datadir} #{file_list} | gzip -9fc" ) do |io|
 #      store_url = "#{ll}/data.#{sitename}.#{Time.now.strftime('%Y%m%d-%H%M%S')}.tgz"
-      store_url = "#{ll}/data.#{sitename}.temp.tgz"
-      puts "storing #{store_url}"
-      AWS::S3::S3Object.store( store_url, io.read, bucket, :access => :public_read )
-    end
+#      puts "storing #{store_url}"
+#      AWS::S3::S3Object.store( store_url, io.read, bucket, :access => :public_read )
+#    end
+    io = IO.popen( "tar c -C #{datadir} #{file_list} | gzip -9fc" )
+    puts "storing #{store_url}"
+    AWS::S3::S3Object.store( store_url, io.read, bucket, :access => :public_read )
+    io.close
   end
 
   @rake_tasks << [[:logs,:fetch], :fetch_logs, 'fetch log files']
@@ -147,7 +151,7 @@ class LiquiLogs::Worker
 
   @rake_tasks << [[:stats,:run], :run_stats, 'run awstats']
   def run_stats
-    ENV['AWSTATS_PATH']= Pathname.pwd
+    ENV['AWSTATS_PATH']= Pathname.pwd.to_s
     ENV['AWSTATS_SITEDOMAIN']= sitename
 
     system( "awstats/wwwroot/cgi-bin/awstats.pl -config=#{sitename} -update" )
@@ -161,7 +165,7 @@ class LiquiLogs::Worker
     htmldir.mkpath
 #    ( sitedir + 'html' ).mkpath
 
-    ENV['AWSTATS_PATH']= Pathname.pwd
+    ENV['AWSTATS_PATH']= Pathname.pwd.to_s
     ENV['AWSTATS_SITEDOMAIN']= sitename
 
     system( "awstats/tools/awstats_buildstaticpages.pl -config=#{sitename} -awstatsprog=#{Pathname.pwd + 'awstats' + 'wwwroot' + 'cgi-bin' + 'awstats.pl'} -dir=#{htmldir}" )
@@ -172,7 +176,7 @@ class LiquiLogs::Worker
 
   @rake_tasks << [[:pages,:store], :store_pages, 'store HTML pages to S3']
   def store_pages
-    Dir[htmldir + '*'].each do |f_name|
+    Dir[(htmldir + '*').to_s].each do |f_name|
       puts "sending #{f_name}"
       AWS::S3::S3Object.store( f_name, open( f_name ), bucket, :access => :public_read )
     end

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+source ~/.rvm/scripts/rvm
+
+# select a ruby, can use a gemset if you need.
+rvm 1.8.7@runner
+
+cd `dirname $0`
+rake run_all
