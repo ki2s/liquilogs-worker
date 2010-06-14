@@ -16,6 +16,19 @@ ValidHTTPCodes="200 206 304"
 DirIcons="http://ki2s-icons.s3.amazonaws.com/6.95/icon"
 
 
+ExtraSectionName1="Downloads (mov,m4v) - Top 10"
+ExtraSectionCodeFilter1="200 206 304"
+ExtraSectionCondition1="URL,(.*((\.mov)|(\.m4v)))"
+ExtraSectionFirstColumnTitle1="Download"
+ExtraSectionFirstColumnValues1="URL,(.*)"
+ExtraSectionFirstColumnFormat1="%s"
+ExtraSectionStatTypes1=HBL
+ExtraSectionAddAverageRow1=0
+ExtraSectionAddSumRow1=1
+MaxNbOfExtra1=10
+MinHitExtra1=1
+
+
 # AWSTATS CONFIGURE FILE 6.6
 #-----------------------------------------------------------------------------
 # Copy this file into awstats.www.mydomain.conf and edit this new config file
